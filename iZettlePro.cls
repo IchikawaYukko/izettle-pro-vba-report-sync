@@ -16,7 +16,7 @@ Private ReportURL As String
 Private csv As String
 Private downloaded_data As Collection
 
-Public Sub get_access_token(ipos_username As String, ipos_password As String)
+Public Function get_access_token(ipos_username As String, ipos_password As String)
     Dim json As Object
     Dim header As Dictionary
     
@@ -33,9 +33,10 @@ Public Sub get_access_token(ipos_username As String, ipos_password As String)
         
     Set json = json_parser(XmlHttpWrapper(url, "POST", postparam, header))
     AuthToken = json.access_token
-End Sub
+    get_access_token = json.access_token
+End Function
 
-Public Sub get_report_url(start_date As Date, end_date As Date)
+Public Function get_report_url(start_date As Date, end_date As Date)
     Dim header As Dictionary
     Dim json As Object
     
@@ -51,18 +52,69 @@ Public Sub get_report_url(start_date As Date, end_date As Date)
     
     Set json = json_parser(XmlHttpWrapper(url, "GET", "", header))
     ReportURL = json.url
-End Sub
+    get_report_url = json.url
+End Function
 
 Public Sub download_report()
     csv = XmlHttpWrapper(ReportURL, "GET")
 End Sub
 
-Public Sub insert_db()
+Public Sub insert_db(table_name As String)
     Dim db As DAO.Database
     Set db = CurrentDb
-    db.Execute ("INSERT INTO")
-    db.Close: db = Nothing
+    
+    Dim test As Double
+    downloaded_data.Remove (1)  ' Delete 1st row
+    For Each d In downloaded_data
+        guery = build_query(d, table_name)
+        
+        ' Debug Output
+        Forms![Downloader]![List2].AddItem Replace(Mid(guery, InStr(guery, "VALUES(") + 7), ",", "_")
+        ' Listbox auto scroll bottom
+        Forms![Downloader]![List2].Selected(Forms![Downloader]![List2].ListCount - 1) = True
+        DoEvents
+        
+        db.Execute (guery)
+    Next d
+    db.Close: Set db = Nothing
 End Sub
+
+Private Function build_query(d As Variant, table_name As String)
+        Dim trans_time As String
+        Dim paidoff_date As String
+        
+        trans_time = convert_empty_date2null(d(12))
+        paidoff_date = convert_empty_date2null(d(13))
+
+        build_query = "INSERT INTO " & table_name & "(" & _
+        "Terminal, OrderNumber, OrderId, OrderLineId," & _
+        "ParentOrderLineId, DepartmentId, UserName, UserId," & _
+        "TransactionType, ProductName, ProductId, TransactionTime," & _
+        "PaidOffDate, CategoryName, CategoryId, GrossAmount," & _
+        "TaxAmount, NetAmount, PaymentType, [Value]" & _
+        ")" & _
+        " VALUES(" & d(1) & "," & d(2) & _
+        ",""" & d(3) & """" & ",""" & d(4) & """" & _
+        ",""" & d(5) & """" & ",""" & d(6) & """" & _
+        ",""" & d(7) & """" & ",""" & d(8) & """" & _
+        ",""" & d(9) & """" & ",""" & d(10) & """" & _
+        ",""" & d(11) & """" & _
+        "," & trans_time & "," & paidoff_date & _
+        ",""" & d(14) & """" & ",""" & d(15) & """" & _
+        "," & Val(d(16)) & "," & Val(d(17)) & _
+        "," & Val(d(18)) & _
+        ",""" & d(19) & """" & _
+        "," & Val(d(20)) & _
+        ")"
+End Function
+
+Private Function convert_empty_date2null(date_ As Variant)
+        If date_ <> "" Then
+            convert_empty_date2null = "#" & date_ & "#"
+        Else
+            convert_empty_date2null = "null"
+        End If
+End Function
 
 Private Function XmlHttpWrapper(ByVal url As String, method As String, _
         Optional ByVal postparam As String = "", _
@@ -102,6 +154,9 @@ Public Sub csv2array()
     csvlines = Split(csv, vbLf)
     For Each line_ In csvlines
         Set linedata = New Collection
+        If line_ = "" Then
+            Exit For
+        End If
         cells = Split(line_, ",")
         For Each cell In cells
             cell = Replace(cell, """", "")
