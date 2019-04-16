@@ -17,7 +17,7 @@ Private csv As String
 Private downloaded_data As Collection
 
 Public Function get_access_token(ipos_username As String, ipos_password As String)
-    Dim json As Object
+    Dim Json As Object
     Dim header As Dictionary
     
     authcode = EncodeBase64("iposbackoffice:")
@@ -31,14 +31,14 @@ Public Function get_access_token(ipos_username As String, ipos_password As Strin
     header.Add "Authorization", "Basic " & authcode
     header.Add "Content-Type", "application/x-www-form-urlencoded"
         
-    Set json = json_parser(XmlHttpWrapper(url, "POST", postparam, header))
-    AuthToken = json.access_token
-    get_access_token = json.access_token
+    Set Json = json_parser(XmlHttpWrapper(url, "POST", postparam, header))
+    AuthToken = Json("access_token")
+    get_access_token = Json("access_token")
 End Function
 
 Public Function get_report_url(start_date As Date, end_date As Date)
     Dim header As Dictionary
-    Dim json As Object
+    Dim Json As Object
     
     report_type = "full-transaction"
     param = report_type & _
@@ -50,9 +50,9 @@ Public Function get_report_url(start_date As Date, end_date As Date)
     Set header = New Dictionary
     header.Add "Authorization", "Bearer " & AuthToken
     
-    Set json = json_parser(XmlHttpWrapper(url, "GET", "", header))
-    ReportURL = json.url
-    get_report_url = json.url
+    Set Json = json_parser(XmlHttpWrapper(url, "GET", "", header))
+    ReportURL = Json("url")
+    get_report_url = Json("url")
 End Function
 
 Public Sub download_report()
@@ -168,14 +168,11 @@ Public Sub csv2array()
     Set downloaded_data = data
 End Sub
 
-Private Function json_parser(json_text As String) As Object
+Private Function json_parser(json_Text As String) As Object
     Dim obj As Object
-    Set obj = CreateObject("ScriptControl")
-    
-    obj.Language = "JScript"
-    obj.AddCode "function jsonParse(s) { return eval('(' + s + ')'); }"
+    Set obj = JsonConverter.ParseJson(json_Text)
 
-    Set json_parser = obj.CodeObject.jsonParse(json_text)
+    Set json_parser = obj
 End Function
 
 Private Function EncodeBase64(text As String) As String
